@@ -1,6 +1,6 @@
 module.exports = {
 	/** Number of redelivery attempts */
-	HEADER_REDELIVERED_COUNT: "x-redelivered-count",
+	HEADER_REDELIVERED_COUNT: "x-delivery-count",
 	/** Consumer group name */
 	HEADER_GROUP: "x-group",
 

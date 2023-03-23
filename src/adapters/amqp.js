@@ -291,6 +291,17 @@ class AmqpAdapter extends BaseAdapter {
 			chan.amqp ? chan.amqp.queueOptions : {},
 			this.opts.amqp.queueOptions
 		);
+		// enforce quorum queue types
+		if (
+			queueOptions.arguments &&
+			queueOptions.arguments["x-queue-type"] &&
+			queueOptions.arguments["x-queue-type"] !== "quorum"
+		) {
+			this.broker.logger.warn(
+				`x-queue-type set to: ${queueOptions.arguments["x-queue-type"]}; overriding to 'quorum'`
+			);
+		}
+		queueOptions.arguments = { ...queueOptions.arguments, "x-queue-type": "quorum" };
 
 		chan.deadLettering = _.defaultsDeep({}, chan.deadLettering, this.opts.deadLettering);
 
@@ -420,6 +431,7 @@ class AmqpAdapter extends BaseAdapter {
 				}
 
 				let redeliveryCount = msg.properties.headers[C.HEADER_REDELIVERED_COUNT] || 0;
+
 				redeliveryCount++;
 				if (chan.maxRetries > 0 && redeliveryCount >= chan.maxRetries) {
 					if (chan.deadLettering.enabled) {
@@ -436,34 +448,13 @@ class AmqpAdapter extends BaseAdapter {
 						this.channel.nack(msg, false, false);
 					}
 				} else {
-					// Redeliver the message directly to the queue instead of exchange
 					const queueName = `${chan.group}.${chan.name}`;
-					this.logger.warn(
-						`Redeliver message into '${queueName}' queue.`,
-						redeliveryCount
-					);
+					this.logger.warn(`Requeue message into '${queueName}' queue.`, redeliveryCount);
 
 					this.metricsIncrement(C.METRIC_CHANNELS_MESSAGES_RETRIES_TOTAL, chan);
 
-					const res = this.channel.publish("", queueName, msg.content, {
-						headers: Object.assign({}, msg.properties.headers, {
-							[C.HEADER_REDELIVERED_COUNT]: redeliveryCount
-						})
-					});
-					// write buffer is full, try to move to dead-letter or throw away
-					if (res === false) {
-						if (chan.deadLettering.enabled) {
-							this.logger.debug(
-								`Redelivery write buffer is full. Moving message to '${chan.deadLettering.queueName}' queue...`
-							);
-							this.moveToDeadLetter(chan, msg);
-						} else {
-							this.logger.debug(
-								`Redelivery write buffer is full. Dead letter queue is not enabled, throwing away message`
-							);
-							this.channel.nack(msg, false, false);
-						}
-					}
+					// requeue
+					this.channel.nack(msg, false, true);
 				}
 			}
 		};
