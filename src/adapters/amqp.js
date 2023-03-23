@@ -430,7 +430,7 @@ class AmqpAdapter extends BaseAdapter {
 						this.logger.error(
 							`Message redelivered too many times (${redeliveryCount}). Drop message...`
 						);
-						this.channel.nack(msg, false, false);
+						this.channel.ack(msg);
 					}
 				} else {
 					// Redeliver the message directly to the queue instead of exchange
@@ -447,10 +447,20 @@ class AmqpAdapter extends BaseAdapter {
 							[C.HEADER_REDELIVERED_COUNT]: redeliveryCount
 						})
 					});
-					if (res === false)
-						throw new MoleculerError("AMQP publish error. Write buffer is full.");
-
-					this.channel.ack(msg);
+					// write buffer is full, try to move to dead-letter or throw away
+					if (res === false) {
+						if (chan.deadLettering.enabled) {
+							this.logger.debug(
+								`Redelivery write buffer is full. Moving message to '${chan.deadLettering.queueName}' queue...`
+							);
+							await this.moveToDeadLetter(chan, msg);
+						} else {
+							this.logger.debug(
+								`Redelivery write buffer is full. Dead letter queue is not enabled, throwing away message`
+							);
+							this.channel.nack(msg, false, false);
+						}
+					}
 				}
 			}
 		};
@@ -474,11 +484,13 @@ class AmqpAdapter extends BaseAdapter {
 				}
 			}
 		);
-		if (res === false) throw new MoleculerError("AMQP publish error. Write buffer is full.");
-
-		this.metricsIncrement(C.METRIC_CHANNELS_MESSAGES_DEAD_LETTERING_TOTAL, chan);
-
-		this.channel.ack(msg);
+		if (res) {
+			this.metricsIncrement(C.METRIC_CHANNELS_MESSAGES_DEAD_LETTERING_TOTAL, chan);
+			this.channel.ack(msg);
+		} else {
+			this.logger.debug(`Dead letter write buffer is full. Throwing away message...`);
+			this.channel.nack(msg, false, false);
+		}
 	}
 
 	/**
