@@ -433,7 +433,7 @@ class AmqpAdapter extends BaseAdapter {
 						this.logger.error(
 							`Message redelivered too many times (${redeliveryCount}). Drop message...`
 						);
-						this.channel.ack(msg);
+						this.channel.nack(msg, false, false);
 					}
 				} else {
 					// Redeliver the message directly to the queue instead of exchange
