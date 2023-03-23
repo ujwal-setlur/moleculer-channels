@@ -410,7 +410,7 @@ class AmqpAdapter extends BaseAdapter {
 						this.logger.debug(
 							`No retries, moving message to '${chan.deadLettering.queueName}' queue...`
 						);
-						await this.moveToDeadLetter(chan, msg);
+						this.moveToDeadLetter(chan, msg);
 					} else {
 						// No retries, drop message
 						this.logger.error(`No retries, drop message...`);
@@ -427,7 +427,7 @@ class AmqpAdapter extends BaseAdapter {
 						this.logger.debug(
 							`Message redelivered too many times (${redeliveryCount}). Moving message to '${chan.deadLettering.queueName}' queue...`
 						);
-						await this.moveToDeadLetter(chan, msg);
+						this.moveToDeadLetter(chan, msg);
 					} else {
 						// Reached max retries and no dead-letter topic, drop message
 						this.logger.error(
@@ -456,7 +456,7 @@ class AmqpAdapter extends BaseAdapter {
 							this.logger.debug(
 								`Redelivery write buffer is full. Moving message to '${chan.deadLettering.queueName}' queue...`
 							);
-							await this.moveToDeadLetter(chan, msg);
+							this.moveToDeadLetter(chan, msg);
 						} else {
 							this.logger.debug(
 								`Redelivery write buffer is full. Dead letter queue is not enabled, throwing away message`
@@ -475,7 +475,7 @@ class AmqpAdapter extends BaseAdapter {
 	 * @param {Channel & AmqpDefaultOptions} chan
 	 * @param {Object} msg
 	 */
-	async moveToDeadLetter(chan, msg) {
+	moveToDeadLetter(chan, msg) {
 		// nack the message; it should go into the queue's dead-letter queue
 		this.channel.nack(msg, false, false);
 
