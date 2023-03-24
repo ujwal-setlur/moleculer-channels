@@ -377,8 +377,8 @@ class AmqpAdapter extends BaseAdapter {
 				deadLetterRoutingKey: queueName,
 				messageTtl: 5000
 			};
-			this.logger.debug(`Asserting '${queueName}.retry' queue...`, retryQueueOptions);
-			await this.channel.assertQueue(`${queueName}.retry`, retryQueueOptions);
+			this.logger.debug(`Asserting '${retryQueueName}' queue...`, retryQueueOptions);
+			await this.channel.assertQueue(retryQueueName, retryQueueOptions);
 			// --- BIND RETRY QUEUE TO RETRY EXCHANGE ---
 			this.logger.debug(`Binding '${retryExchangeName}' -> '${retryQueueName}'...`);
 			this.channel.bindQueue(retryQueueName, retryExchangeName, "");
