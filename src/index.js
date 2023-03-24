@@ -36,6 +36,7 @@ const C = require("./constants");
  * @property {Boolean} unsubscribing Flag denoting if service is stopping
  * @property {Number?} maxInFlight Maximum number of messages that can be processed simultaneously
  * @property {Number} maxRetries Maximum number of retries before sending the message to dead-letter-queue
+ * @property {Number} retryInterval interval between reties in milliseconds; currently amqp only
  * @property {DeadLetteringOptions?} deadLettering Dead-letter-queue options
  * @property {Function} handler User defined handler
  */

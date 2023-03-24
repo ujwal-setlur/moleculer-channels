@@ -27,6 +27,7 @@ const C = require("../constants");
  * @property {String} consumerName Name of the consumer
  * @property {String} serializer Type of serializer to use in message exchange. Defaults to JSON
  * @property {Number} maxRetries Maximum number of retries before sending the message to dead-letter-queue or drop
+ * @property {Number} retryInterval Interval in milliseconds between retries
  * @property {Number} maxInFlight Maximum number of messages that can be processed in parallel.
  * @property {DeadLetteringOptions} deadLettering Dead-letter-queue options
  */

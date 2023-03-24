@@ -375,7 +375,7 @@ class AmqpAdapter extends BaseAdapter {
 				...queueOptions,
 				deadLetterExchange: chan.name,
 				deadLetterRoutingKey: queueName,
-				messageTtl: 5000
+				messageTtl: this.opts.retryInterval || 0
 			};
 			this.logger.debug(`Asserting '${retryQueueName}' queue...`, retryQueueOptions);
 			await this.channel.assertQueue(retryQueueName, retryQueueOptions);
