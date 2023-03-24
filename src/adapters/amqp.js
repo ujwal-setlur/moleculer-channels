@@ -306,6 +306,8 @@ class AmqpAdapter extends BaseAdapter {
 		chan.deadLettering = _.defaultsDeep({}, chan.deadLettering, this.opts.deadLettering);
 
 		const queueName = `${chan.group}.${chan.name}`;
+		const retryExchangeName = `${chan.name}.retry`;
+		const retryQueueName = `${queueName}.retry`;
 
 		try {
 			if (chan.maxRetries == null) chan.maxRetries = this.opts.maxRetries;
@@ -316,31 +318,29 @@ class AmqpAdapter extends BaseAdapter {
 					chan.deadLettering.exchangeName
 				);
 
-				this.logger.debug(`Asserting exchange ${chan.deadLettering.exchangeName}`);
-				this.assertedExchanges.add(chan.deadLettering.exchangeName);
-				await this.channel.assertExchange(
-					chan.deadLettering.exchangeName,
-					"fanout",
-					exchangeOptions
-				);
-
 				// assert dead letter queue
 				this.logger.debug(`Asserting queue '${chan.deadLettering.queueName}'`);
 				await this.channel.assertQueue(chan.deadLettering.queueName, queueOptions);
 
-				// bind queue to exchange
-				this.logger.debug(
-					`Binding '${chan.deadLettering.exchangeName}' -> '${chan.deadLettering.queueName}'...`
-				);
-				this.channel.bindQueue(
-					chan.deadLettering.queueName,
-					chan.deadLettering.exchangeName,
-					""
-				);
+				if (chan.deadLettering.exchangeName) {
+					this.logger.debug(`Asserting exchange ${chan.deadLettering.exchangeName}`);
+					this.assertedExchanges.add(chan.deadLettering.exchangeName);
+					await this.channel.assertExchange(
+						chan.deadLettering.exchangeName,
+						"fanout",
+						exchangeOptions
+					);
 
-				// set up RabbitMQ dead-letter config
-				queueOptions.deadLetterExchange = chan.deadLettering.exchangeName;
-				queueOptions.deadLetterRoutingKey = chan.deadLettering.queueName;
+					// bind queue to exchange
+					this.logger.debug(
+						`Binding '${chan.deadLettering.exchangeName}' -> '${chan.deadLettering.queueName}'...`
+					);
+					this.channel.bindQueue(
+						chan.deadLettering.queueName,
+						chan.deadLettering.exchangeName,
+						""
+					);
+				}
 			}
 
 			// --- CREATE EXCHANGE ---
@@ -351,13 +351,37 @@ class AmqpAdapter extends BaseAdapter {
 
 			// --- CREATE QUEUE ---
 			// More info: http://www.squaremobius.net/amqp.node/channel_api.html#channel_assertQueue
-
-			this.logger.debug(`Asserting '${queueName}' queue...`, queueOptions);
-			await this.channel.assertQueue(queueName, queueOptions);
+			const mainQueueOptions = {
+				...queueOptions,
+				deadLetterExchange: retryExchangeName,
+				deadLetterRoutingKey: retryQueueName
+			};
+			this.logger.debug(`Asserting '${queueName}' queue...`, mainQueueOptions);
+			await this.channel.assertQueue(queueName, mainQueueOptions);
 
 			// --- BIND QUEUE TO EXCHANGE ---
 			this.logger.debug(`Binding '${chan.name}' -> '${queueName}'...`);
 			this.channel.bindQueue(queueName, chan.name, "");
+
+			// --- CREATE RETRY EXCHANGE ---
+			this.logger.debug(
+				`Asserting '${retryExchangeName}' fanout exchange...`,
+				exchangeOptions
+			);
+			this.channel.assertExchange(retryExchangeName, "fanout", exchangeOptions);
+
+			// --- SETUP RETRY QUEUE WITH TTL ---
+			const retryQueueOptions = {
+				...queueOptions,
+				deadLetterExchange: chan.name,
+				deadLetterRoutingKey: queueName,
+				messageTtl: 5000
+			};
+			this.logger.debug(`Asserting '${queueName}.retry' queue...`, retryQueueOptions);
+			await this.channel.assertQueue(`${queueName}.retry`, retryQueueOptions);
+			// --- BIND RETRY QUEUE TO RETRY EXCHANGE ---
+			this.logger.debug(`Binding '${retryExchangeName}' -> '${retryQueueName}'...`);
+			this.channel.bindQueue(retryQueueName, retryExchangeName, "");
 
 			// More info http://www.squaremobius.net/amqp.node/channel_api.html#channel_consume
 			const consumerOptions = _.defaultsDeep(
@@ -421,40 +445,45 @@ class AmqpAdapter extends BaseAdapter {
 						this.logger.debug(
 							`No retries, moving message to '${chan.deadLettering.queueName}' queue...`
 						);
-						this.moveToDeadLetter(chan, msg);
+						await this.moveToDeadLetter(chan, msg);
 					} else {
 						// No retries, drop message
 						this.logger.error(`No retries, drop message...`);
-						this.channel.nack(msg, false, false);
+						this.channel.ack(msg);
 					}
 					return;
 				}
 
-				let redeliveryCount = msg.properties.headers[C.HEADER_REDELIVERED_COUNT] || 0;
+				const xDeath = msg.properties.headers[C.HEADER_DEAD_LETTER];
 
+				let redeliveryCount = xDeath ? xDeath[0].count : 0;
 				redeliveryCount++;
+
 				if (chan.maxRetries > 0 && redeliveryCount >= chan.maxRetries) {
 					if (chan.deadLettering.enabled) {
 						// Reached max retries and has dead-letter topic, move message
-						this.logger.debug(
+						this.logger.warn(
 							`Message redelivered too many times (${redeliveryCount}). Moving message to '${chan.deadLettering.queueName}' queue...`
 						);
-						this.moveToDeadLetter(chan, msg);
+						await this.moveToDeadLetter(chan, msg);
 					} else {
 						// Reached max retries and no dead-letter topic, drop message
 						this.logger.error(
 							`Message redelivered too many times (${redeliveryCount}). Drop message...`
 						);
-						this.channel.nack(msg, false, false);
+						this.channel.ack(msg);
 					}
 				} else {
 					const queueName = `${chan.group}.${chan.name}`;
-					this.logger.warn(`Requeue message into '${queueName}' queue.`, redeliveryCount);
+					this.logger.warn(
+						`Requeue message into '${queueName}.retry' queue.`,
+						redeliveryCount
+					);
 
 					this.metricsIncrement(C.METRIC_CHANNELS_MESSAGES_RETRIES_TOTAL, chan);
 
-					// requeue
-					this.channel.nack(msg, false, true);
+					// reroute into dead-letter retry queue
+					this.channel.nack(msg, false, false);
 				}
 			}
 		};
@@ -466,11 +495,22 @@ class AmqpAdapter extends BaseAdapter {
 	 * @param {Channel & AmqpDefaultOptions} chan
 	 * @param {Object} msg
 	 */
-	moveToDeadLetter(chan, msg) {
-		// nack the message; it should go into the queue's dead-letter queue
-		this.channel.nack(msg, false, false);
+	async moveToDeadLetter(chan, msg) {
+		this.channel.publish(
+			chan.deadLettering.exchangeName || "",
+			chan.deadLettering.queueName,
+			msg.content,
+			{
+				headers: {
+					[C.HEADER_ORIGINAL_CHANNEL]: chan.name,
+					[C.HEADER_ORIGINAL_GROUP]: chan.group
+				}
+			}
+		);
 
 		this.metricsIncrement(C.METRIC_CHANNELS_MESSAGES_DEAD_LETTERING_TOTAL, chan);
+
+		this.channel.ack(msg);
 	}
 
 	/**
