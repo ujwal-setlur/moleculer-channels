@@ -109,6 +109,8 @@ class AmqpAdapter extends BaseAdapter {
 		 * @type {Set<string>}
 		 */
 		this.assertedExchanges = new Set(); // For a collecting exchange names on which assertExchange() was called
+
+		this.createdRetryExchange = false;
 	}
 
 	/**
@@ -306,7 +308,7 @@ class AmqpAdapter extends BaseAdapter {
 		chan.deadLettering = _.defaultsDeep({}, chan.deadLettering, this.opts.deadLettering);
 
 		const queueName = `${chan.group}.${chan.name}`;
-		const retryExchangeName = `${chan.name}.retry`;
+		const retryExchangeName = `${chan.group}.retry`;
 		const retryQueueName = `${queueName}.retry`;
 
 		try {
@@ -366,11 +368,13 @@ class AmqpAdapter extends BaseAdapter {
 			this.channel.bindQueue(queueName, chan.name, "");
 
 			// --- CREATE RETRY EXCHANGE ---
-			this.logger.debug(
-				`Asserting '${retryExchangeName}' fanout exchange...`,
-				exchangeOptions
-			);
-			this.channel.assertExchange(retryExchangeName, "fanout", exchangeOptions);
+			if (!this.createdRetryExchange) {
+				this.logger.debug(
+					`Asserting '${retryExchangeName}' fanout exchange...`,
+					exchangeOptions
+				);
+				this.channel.assertExchange(retryExchangeName, "direct", exchangeOptions);
+			}
 
 			// --- SETUP RETRY QUEUE WITH TTL ---
 			const retryQueueOptions = {
@@ -383,7 +387,7 @@ class AmqpAdapter extends BaseAdapter {
 			await this.channel.assertQueue(retryQueueName, retryQueueOptions);
 			// --- BIND RETRY QUEUE TO RETRY EXCHANGE ---
 			this.logger.debug(`Binding '${retryExchangeName}' -> '${retryQueueName}'...`);
-			this.channel.bindQueue(retryQueueName, retryExchangeName, "");
+			this.channel.bindQueue(retryQueueName, retryExchangeName, retryQueueName);
 
 			// More info http://www.squaremobius.net/amqp.node/channel_api.html#channel_consume
 			const consumerOptions = _.defaultsDeep(
