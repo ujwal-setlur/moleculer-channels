@@ -10,6 +10,7 @@ const BaseAdapter = require("./base");
 const _ = require("lodash");
 const { MoleculerError, MoleculerRetryableError } = require("moleculer").Errors;
 const C = require("../constants");
+const { poll } = require("../utils");
 
 let Amqplib;
 
@@ -32,6 +33,7 @@ let Amqplib;
  * @property {Object} amqp.exchangeOptions AMQP lib exchange configuration
  * @property {Object} amqp.messageOptions AMQP lib message configuration
  * @property {Object} amqp.consumerOptions AMQP lib consume configuration
+ * @property {Number} amqp.highWaterMark AMQP highWaterMark setting for channel write buffer
  * @property {publishAssertExchange} amqp.publishAssertExchange AMQP lib exchange configuration for one-time calling assertExchange() before publishing in new exchange by sendToChannel
  */
 
@@ -79,7 +81,7 @@ class AmqpAdapter extends BaseAdapter {
 				socketOptions: {},
 				queueOptions: {},
 				exchangeOptions: {},
-				messageOptions: {},
+				messageOptions: { timeout: C.DEFAULT_PUBLISH_TIMEOUT },
 				consumerOptions: {}
 			}
 		});
@@ -111,6 +113,8 @@ class AmqpAdapter extends BaseAdapter {
 		this.assertedExchanges = new Set(); // For a collecting exchange names on which assertExchange() was called
 
 		this.createdRetryExchange = false;
+
+		this.writeBufferReady = true;
 	}
 
 	/**
@@ -199,6 +203,19 @@ class AmqpAdapter extends BaseAdapter {
 		this.logger.info("AMQP is connected.");
 
 		this.logger.debug(`Creating AMQP channel...`);
+
+		// workaround for setting high water mark.
+		const { highWaterMark } = this.opts.amqp;
+		if (highWaterMark && Number.isInteger(highWaterMark) && highWaterMark > 0) {
+			this.logger.info(`AMQP channel High Water Mark: ${highWaterMark}`);
+			const TestChannel = await this.connection.createChannel();
+			TestChannel.__proto__.allocate = function () {
+				this.ch = this.connection.freshChannel(this, { highWaterMark });
+				return this;
+			};
+			await TestChannel.close();
+		}
+
 		this.channel = await this.connection.createChannel();
 		this.channel
 			.on("close", () => {
@@ -211,6 +228,7 @@ class AmqpAdapter extends BaseAdapter {
 			})
 			.on("drain", () => {
 				this.logger.info("AMQP channel is drained.");
+				this.writeBufferReady = true;
 			})
 			.on("return", msg => {
 				this.logger.warn("AMQP channel returned a message.", msg);
@@ -577,6 +595,14 @@ class AmqpAdapter extends BaseAdapter {
 	}
 
 	/**
+	 * Checks whether channel write buffer is full, and we need to wait
+	 * @returns {boolean}
+	 */
+	isWriteBufferReady() {
+		return this.writeBufferReady;
+	}
+
+	/**
 	 * Publish a payload to a channel.
 	 *
 	 * @param {String} channelName
@@ -599,7 +625,8 @@ class AmqpAdapter extends BaseAdapter {
 				expiration: opts.ttl,
 				priority: opts.priority,
 				correlationId: opts.correlationId,
-				headers: opts.headers
+				headers: opts.headers,
+				timeout: opts.timeout
 				// ? mandatory: opts.mandatory
 			},
 			this.opts.amqp.messageOptions
@@ -632,8 +659,30 @@ class AmqpAdapter extends BaseAdapter {
 			);
 		}
 
-		const res = this.channel.publish(channelName, opts.routingKey || "", data, messageOptions);
-		if (res === false) throw new MoleculerError("AMQP publish error. Write buffer is full.");
+		// check if write buffer is ready
+		if (this.isWriteBufferReady()) {
+			this.writeBufferReady = this.channel.publish(
+				channelName,
+				opts.routingKey || "",
+				data,
+				messageOptions
+			);
+		} else {
+			this.broker.logger.debug(`polling write buffer...`);
+			// poll the write buffer status
+			try {
+				await poll(() => this.isWriteBufferReady(), messageOptions.timeout, 1);
+				this.writeBufferReady = this.channel.publish(
+					channelName,
+					opts.routingKey || "",
+					data,
+					messageOptions
+				);
+			} catch (err) {
+				throw new MoleculerError("AMQP publish error: write buffer full");
+			}
+		}
+
 		this.logger.debug(`Message was published at '${channelName}'`);
 	}
 

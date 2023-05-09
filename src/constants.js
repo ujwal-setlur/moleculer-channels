@@ -19,5 +19,8 @@ module.exports = {
 
 	METRIC_CHANNELS_MESSAGES_ERRORS_TOTAL: "moleculer.channels.messages.errors.total",
 	METRIC_CHANNELS_MESSAGES_RETRIES_TOTAL: "moleculer.channels.messages.retries.total",
-	METRIC_CHANNELS_MESSAGES_DEAD_LETTERING_TOTAL: "moleculer.channels.messages.deadLettering.total"
+	METRIC_CHANNELS_MESSAGES_DEAD_LETTERING_TOTAL:
+		"moleculer.channels.messages.deadLettering.total",
+
+	DEFAULT_PUBLISH_TIMEOUT: 10000
 };

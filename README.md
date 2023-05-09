@@ -188,7 +188,7 @@ module.exports = {
 | `schemaProperty`      | `String`           | `"channels"`       | Name of the property in service schema.                                                                                                          |
 | `sendMethodName`      | `String`           | `"sendToChannel"`  | Name of the method in ServiceBroker to send message to the channels.                                                                             |
 | `adapterPropertyName` | `String`           | `"channelAdapter"` | Name of the property in ServiceBroker to access the `Adapter` instance directly.                                                                 |
-| `context` | `boolean`           | `false` | Using Moleculer context in channel handlers by default.                                                                |
+| `context`             | `boolean`          | `false`            | Using Moleculer context in channel handlers by default.                                                                                          |
 
 **Examples**
 
@@ -219,8 +219,8 @@ module.exports = {
 | `maxRetries`                           | `Number`                                  | \*                 | Maximum number of retries before sending the message to dead-letter-queue or drop.                                                                                                                                |
 | `deadLettering.enabled`                | `Boolean`                                 | \*                 | Enable "Dead-lettering" feature.                                                                                                                                                                                  |
 | `deadLettering.queueName`              | `String`                                  | \*                 | Name of dead-letter queue.                                                                                                                                                                                        |
-| `context`                              | `boolean`                                 | \*                 | Using Moleculer context in channel handlers.  |
-| `tracing`                              | `Object`                                 | \*                 | Tracing options same as [action tracing options](https://moleculer.services/docs/0.14/tracing.html#Customizing). It works only with `context: true`. |
+| `context`                              | `boolean`                                 | \*                 | Using Moleculer context in channel handlers.                                                                                                                                                                      |
+| `tracing`                              | `Object`                                  | \*                 | Tracing options same as [action tracing options](https://moleculer.services/docs/0.14/tracing.html#Customizing). It works only with `context: true`.                                                              |
 | `handler`                              | `Function(payload: any, rawMessage: any)` | \*                 | Channel handler function. It receives the payload at first parameter. The second parameter is a raw message which depends on the adapter.                                                                         |
 | `redis.startID`                        | `String`                                  | Redis              | Starting point when consumers fetch data from the consumer group. By default equals to `$`, i.e., consumers will only see new elements arriving in the stream. More info [here](https://redis.io/commands/XGROUP) |
 | `redis.minIdleTime`                    | `Number`                                  | Redis              | Time (in milliseconds) after which pending messages are considered NACKed and should be claimed. Defaults to 1 hour.                                                                                              |
@@ -255,22 +255,22 @@ Use the `broker.sendToChannel(channelName, payload, opts)` method to send a mess
 
 ### Method options
 
-| Name                                    | Type                 | Supported adapters            | Description                                                                                                                                                                                   |
-| --------------------------------------- | -------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `raw`                                   | `Boolean`            | \*                            | If truthy, the payload won't be serialized.                                                                                                                                                   |
-| `persistent`                            | `Boolean`            | AMQP                          | If truthy, the message will survive broker restarts provided it’s in a queue that also survives restarts.                                                                                     |
-| `ttl`                                   | `Number`             | AMQP                          | If supplied, the message will be discarded from a queue once it’s been there longer than the given number of milliseconds.                                                                    |
-| `priority`                              | `Number`             | AMQP                          | Priority of the message.                                                                                                                                                                      |
-| `correlationId`                         | `String`             | AMQP                          | Request identifier.                                                                                                                                                                           |
-| `headers`                               | `Object`             | AMQP, JetStream, Kafka, Redis | Application specific headers to be carried along with the message content.                                                                                                                    |
-| `routingKey`                            | `Object`             | AMQP                          | The AMQP `publish` method's second argument. If you want to send the message into an external queue instead of exchange, set the `channelName` to `""` and set the queue name to `routingKey` |
-| `publishAssertExchange.enabled`         | `Boolean`            | AMQP                          | Enable/disable calling once `channel.assertExchange()` before first publishing in new exchange by `sendToChannel()`                                                                           |
-| `publishAssertExchange.exchangeOptions` | `Object`             | AMQP                          | AMQP lib exchange configuration when publishAssertExchange enabled                                                                                                                            |
-| `key`                                   | `String`             | Kafka                         | Key of Kafka message.                                                                                                                                                                         |
-| `partition`                             | `String`             | Kafka                         | Partition of Kafka message.                                                                                                                                                                   |
-| `acks`                                  | `Number`             | Kafka                         | Control the number of required acks.                                                                                                                                                          |
-| `timeout`                               | `Number`             | Kafka                         | The time to await a response in ms. Default: `30000`                                                                                                                                          |
-| `compression`                           | `any`                | Kafka                         | Compression codec. Default: `CompressionTypes.None`                                                                                                                                           |
+| Name                                    | Type      | Supported adapters            | Description                                                                                                                                                                                   |
+| --------------------------------------- | --------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `raw`                                   | `Boolean` | \*                            | If truthy, the payload won't be serialized.                                                                                                                                                   |
+| `persistent`                            | `Boolean` | AMQP                          | If truthy, the message will survive broker restarts provided it’s in a queue that also survives restarts.                                                                                     |
+| `ttl`                                   | `Number`  | AMQP                          | If supplied, the message will be discarded from a queue once it’s been there longer than the given number of milliseconds.                                                                    |
+| `priority`                              | `Number`  | AMQP                          | Priority of the message.                                                                                                                                                                      |
+| `correlationId`                         | `String`  | AMQP                          | Request identifier.                                                                                                                                                                           |
+| `headers`                               | `Object`  | AMQP, JetStream, Kafka, Redis | Application specific headers to be carried along with the message content.                                                                                                                    |
+| `routingKey`                            | `Object`  | AMQP                          | The AMQP `publish` method's second argument. If you want to send the message into an external queue instead of exchange, set the `channelName` to `""` and set the queue name to `routingKey` |
+| `publishAssertExchange.enabled`         | `Boolean` | AMQP                          | Enable/disable calling once `channel.assertExchange()` before first publishing in new exchange by `sendToChannel()`                                                                           |
+| `publishAssertExchange.exchangeOptions` | `Object`  | AMQP                          | AMQP lib exchange configuration when publishAssertExchange enabled                                                                                                                            |
+| `key`                                   | `String`  | Kafka                         | Key of Kafka message.                                                                                                                                                                         |
+| `partition`                             | `String`  | Kafka                         | Partition of Kafka message.                                                                                                                                                                   |
+| `acks`                                  | `Number`  | Kafka                         | Control the number of required acks.                                                                                                                                                          |
+| `timeout`                               | `Number`  | AMQP, Kafka                   | The time to await a response in ms. Default: `30000`                                                                                                                                          |
+| `compression`                           | `any`     | Kafka                         | Compression codec. Default: `CompressionTypes.None`                                                                                                                                           |
 
 ## Middleware hooks
 
@@ -332,7 +332,7 @@ module.exports = {
     middlewares: [
         ChannelsMiddleware({
             adapter: "redis://localhost:6379",
-            // Enable context in all channel handlers 
+            // Enable context in all channel handlers
             context: true
         })
     ]
@@ -352,7 +352,7 @@ module.exports = {
     channels: {
         "default.options.topic": {
             context: true, // Unless not enabled it globally
-            async handler(ctx/*, raw*/) {
+            async handler(ctx /*, raw*/) {
                 // The `ctx` is a regular Moleculer Context
                 if (ctx.meta.loggedInUser) {
                     // The `ctx.params` contains the original payload of the message
@@ -375,26 +375,33 @@ module.exports = {
     actions: {
         submitOrder: {
             async handler(ctx) {
-                await broker.sendToChannel("order.created", {
-                    id: 1234,
-                    items: [/*...*/]
-                }, {
-                    // Pass the `ctx` in options of `sendToChannel`
-                    ctx
-                });
-
+                await broker.sendToChannel(
+                    "order.created",
+                    {
+                        id: 1234,
+                        items: [
+                            /*...*/
+                        ]
+                    },
+                    {
+                        // Pass the `ctx` in options of `sendToChannel`
+                        ctx
+                    }
+                );
             }
         }
-    },
-}
+    }
+};
 ```
 
 ### Tracing
+
 To enable tracing for context-based handlers, you should register `Tracing` middleware in broker options.
 
 > The middleware works only with `context: true`.
 
 **Register channel tracing middleware**
+
 ```js
 //moleculer.config.js
 const TracingMiddleware = require("@moleculer/channels").Tracing;
@@ -405,7 +412,7 @@ module.exports = {
     middlewares: [
         ChannelsMiddleware({
             adapter: "redis://localhost:6379",
-            // Enable context in all channel handlers 
+            // Enable context in all channel handlers
             context: true
         }),
         TracingMiddleware()
@@ -463,6 +470,7 @@ broker.createService({
 | `redis.cluster.nodes`                                 | `Array`                          | `null`                  | Redis              | Redis Cluster nodes list.                                                                                                                                                                                                                    |
 | `redis.cluster.clusterOptions`                        | `Object`                         | `null`                  | Redis              | Redis Cluster options.                                                                                                                                                                                                                       |
 | `amqp.url`                                            | `String`                         | `null`                  | AMQP               | Connection URI.                                                                                                                                                                                                                              |
+| `amqp.highWaterMark`                                  | `Number`                         | `1024`                  | AMQP               | High water mark for AMQP channel write buffer URI.                                                                                                                                                                                           |
 | `amqp.socketOptions`                                  | `Object`                         | `null`                  | AMQP               | AMQP lib socket configuration. More info [here](http://www.squaremobius.net/amqp.node/channel_api.html#connect).                                                                                                                             |
 | `amqp.queueOptions`                                   | `Object`                         | `null`                  | AMQP               | AMQP lib queue configuration. More info [here](http://www.squaremobius.net/amqp.node/channel_api.html#channel_assertQueue).                                                                                                                  |
 | `amqp.exchangeOptions`                                | `Object`                         | `null`                  | AMQP               | AMQP lib exchange configuration. More info [here](http://www.squaremobius.net/amqp.node/channel_api.html#channel_assertExchange).                                                                                                            |
@@ -666,13 +674,13 @@ module.exports = {
                         messageOptions: {},
                         // Options for `channel.consume()`
                         consumerOptions: {},
-						// Note: options for `channel.assertExchange()` before first publishing in new exchange
-						publishAssertExchange: {
-							// Enable/disable calling once `channel.assertExchange()` before first publishing in new exchange by `sendToChannel`
-							enabled: false,
-							// Options for `channel.assertExchange()` before publishing by `sendToChannel`
-							exchangeOptions: {}
-						},
+                        // Note: options for `channel.assertExchange()` before first publishing in new exchange
+                        publishAssertExchange: {
+                            // Enable/disable calling once `channel.assertExchange()` before first publishing in new exchange by `sendToChannel`
+                            enabled: false,
+                            // Options for `channel.assertExchange()` before publishing by `sendToChannel`
+                            exchangeOptions: {}
+                        }
                     },
                     maxInFlight: 10,
                     maxRetries: 3,
@@ -691,23 +699,28 @@ module.exports = {
 **Example Producing messages with options**
 
 ```js
-broker.sendToChannel("order.created", {
-    id: 1234,
-    items: [
-        /*...*/
-    ]
-},{
-    // Using specific `assertExchange()` options only for the current sending case
-    publishAssertExchange:{
-        // Enable/disable calling once `channel.assertExchange()` before first publishing in new exchange by `sendToChannel`
-		enabled: true,
-        // Options for `channel.assertExchange()` before publishing 
-		exchangeOptions: {
-			/*...*/
-		}
-	},
-});
+broker.sendToChannel(
+    "order.created",
+    {
+        id: 1234,
+        items: [
+            /*...*/
+        ]
+    },
+    {
+        // Using specific `assertExchange()` options only for the current sending case
+        publishAssertExchange: {
+            // Enable/disable calling once `channel.assertExchange()` before first publishing in new exchange by `sendToChannel`
+            enabled: true,
+            // Options for `channel.assertExchange()` before publishing
+            exchangeOptions: {
+                /*...*/
+            }
+        }
+    }
+);
 ```
+
 > Note: If you know that the exchange will be created before `sendToChannel` is called by someone else, then it is better to skip `publishAssertExchange` option
 
 ### Kafka
