@@ -462,7 +462,29 @@ class AmqpAdapter extends BaseAdapter {
 
 				this.metricsIncrement(C.METRIC_CHANNELS_MESSAGES_ERRORS_TOTAL, chan);
 
+				// check if this is an internal non-retryable data packet error
+				// note: MoleculerRetryableError extends MoleculerError, so check both
+				if (err instanceof MoleculerError && !(err instanceof MoleculerRetryableError)) {
+					if (chan.deadLettering.enabled) {
+						// move message to dead-letter
+						this.logger.error(
+							`Internal error in processing message in '${chan.name}' queue, moving message to '${chan.deadLettering.queueName}' queue...`,
+							err
+						);
+						await this.moveToDeadLetter(chan, msg);
+					} else {
+						// No dead-letter, drop message
+						this.logger.error(
+							`Internal error in processing message in '${chan.name}' queue, dropping message...`,
+							err
+						);
+						this.channel.ack(msg);
+					}
+					return;
+				}
+
 				this.logger.warn(`AMQP message processing error in '${chan.name}' queue.`, err);
+
 				if (!chan.maxRetries) {
 					if (chan.deadLettering.enabled) {
 						// Reached max retries and has dead-letter topic, move message
