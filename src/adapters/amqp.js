@@ -112,8 +112,6 @@ class AmqpAdapter extends BaseAdapter {
 		 */
 		this.assertedExchanges = new Set(); // For a collecting exchange names on which assertExchange() was called
 
-		this.createdRetryExchange = false;
-
 		this.writeBufferReady = true;
 	}
 
@@ -386,13 +384,11 @@ class AmqpAdapter extends BaseAdapter {
 			this.channel.bindQueue(queueName, chan.name, "");
 
 			// --- CREATE RETRY EXCHANGE ---
-			if (!this.createdRetryExchange) {
-				this.logger.debug(
-					`Asserting '${retryExchangeName}' fanout exchange...`,
-					exchangeOptions
-				);
-				this.channel.assertExchange(retryExchangeName, "direct", exchangeOptions);
-			}
+			this.logger.debug(
+				`Asserting '${retryExchangeName}' direct exchange...`,
+				exchangeOptions
+			);
+			this.channel.assertExchange(retryExchangeName, "direct", exchangeOptions);
 
 			// --- SETUP RETRY QUEUE WITH TTL ---
 			const retryQueueOptions = {
