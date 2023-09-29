@@ -474,7 +474,7 @@ class AmqpAdapter extends BaseAdapter {
 							`Internal error in processing message in '${chan.name}' queue, moving message to '${chan.deadLettering.queueName}' queue...`,
 							err
 						);
-						await this.moveToDeadLetter(chan, msg);
+						await this.moveToDeadLetter(chan, msg, err);
 					} else {
 						// No dead-letter, drop message
 						this.logger.error(
@@ -494,7 +494,7 @@ class AmqpAdapter extends BaseAdapter {
 						this.logger.debug(
 							`No retries, moving message to '${chan.deadLettering.queueName}' queue...`
 						);
-						await this.moveToDeadLetter(chan, msg);
+						await this.moveToDeadLetter(chan, msg, err);
 					} else {
 						// No retries, drop message
 						this.logger.error(`No retries, drop message...`);
@@ -514,7 +514,7 @@ class AmqpAdapter extends BaseAdapter {
 						this.logger.warn(
 							`Message redelivered too many times (${redeliveryCount}). Moving message to '${chan.deadLettering.queueName}' queue...`
 						);
-						await this.moveToDeadLetter(chan, msg);
+						await this.moveToDeadLetter(chan, msg, err);
 					} else {
 						// Reached max retries and no dead-letter topic, drop message
 						this.logger.error(
@@ -543,8 +543,9 @@ class AmqpAdapter extends BaseAdapter {
 	 *
 	 * @param {Channel & AmqpDefaultOptions} chan
 	 * @param {Object} msg
+	 * @param {Error} err
 	 */
-	async moveToDeadLetter(chan, msg) {
+	async moveToDeadLetter(chan, msg, err) {
 		this.channel.publish(
 			chan.deadLettering.exchangeName || "",
 			chan.deadLettering.queueName,
@@ -552,7 +553,8 @@ class AmqpAdapter extends BaseAdapter {
 			{
 				headers: {
 					[C.HEADER_ORIGINAL_CHANNEL]: chan.name,
-					[C.HEADER_ORIGINAL_GROUP]: chan.group
+					[C.HEADER_ORIGINAL_GROUP]: chan.group,
+					[C.HEADER_ERROR_MESSAGE]: err.message
 				}
 			}
 		);

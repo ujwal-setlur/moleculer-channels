@@ -11,6 +11,8 @@ module.exports = {
 	HEADER_ORIGINAL_CHANNEL: "x-original-channel",
 	/** Name of consumer group that could not process the message properly */
 	HEADER_ORIGINAL_GROUP: "x-original-group",
+	/** error message from message processing */
+	HEADER_ERROR_MESSAGE: "x-error-message",
 
 	METRIC_CHANNELS_MESSAGES_SENT: "moleculer.channels.messages.sent",
 	METRIC_CHANNELS_MESSAGES_TOTAL: "moleculer.channels.messages.total",
