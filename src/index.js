@@ -261,7 +261,7 @@ module.exports = function ChannelsMiddleware(mwOpts) {
 						}
 
 						if (!chan.name) chan.name = adapter.addPrefixTopic(name);
-						if (!chan.group) chan.group = svc.fullName;
+						if (chan.group == null) chan.group = svc.fullName; // check for null and undefined (using ==), allow empty string to override mangling of queue name
 						if (chan.context == null) chan.context = mwOpts.context;
 
 						// Consumer ID

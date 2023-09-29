@@ -323,8 +323,8 @@ class AmqpAdapter extends BaseAdapter {
 
 		chan.deadLettering = _.defaultsDeep({}, chan.deadLettering, this.opts.deadLettering);
 
-		const queueName = `${chan.group}.${chan.name}`;
-		const retryExchangeName = `${chan.group}.retry`;
+		const queueName = chan.group ? `${chan.group}.${chan.name}` : chan.name;
+		const retryExchangeName = chan.group ? `${chan.group}.retry` : `${queueName}.retry`;
 		const retryQueueName = `${queueName}.retry`;
 
 		try {
@@ -373,8 +373,12 @@ class AmqpAdapter extends BaseAdapter {
 			// More info: http://www.squaremobius.net/amqp.node/channel_api.html#channel_assertQueue
 			const mainQueueOptions = {
 				...queueOptions,
-				deadLetterExchange: retryExchangeName,
-				deadLetterRoutingKey: retryQueueName
+				...(chan.maxRetries > 0
+					? {
+							deadLetterExchange: retryExchangeName,
+							deadLetterRoutingKey: retryQueueName
+					  }
+					: {})
 			};
 			this.logger.debug(`Asserting '${queueName}' queue...`, mainQueueOptions);
 			await this.channel.assertQueue(queueName, mainQueueOptions);
@@ -384,24 +388,27 @@ class AmqpAdapter extends BaseAdapter {
 			this.channel.bindQueue(queueName, chan.name, "");
 
 			// --- CREATE RETRY EXCHANGE ---
-			this.logger.debug(
-				`Asserting '${retryExchangeName}' direct exchange...`,
-				exchangeOptions
-			);
-			this.channel.assertExchange(retryExchangeName, "direct", exchangeOptions);
+			if (chan.maxRetries > 0) {
+				this.logger.debug(
+					`Asserting '${retryExchangeName}' direct exchange...`,
+					exchangeOptions
+				);
+				this.channel.assertExchange(retryExchangeName, "direct", exchangeOptions);
 
-			// --- SETUP RETRY QUEUE WITH TTL ---
-			const retryQueueOptions = {
-				...queueOptions,
-				deadLetterExchange: chan.name,
-				deadLetterRoutingKey: queueName,
-				messageTtl: this.opts.retryInterval || 0
-			};
-			this.logger.debug(`Asserting '${retryQueueName}' queue...`, retryQueueOptions);
-			await this.channel.assertQueue(retryQueueName, retryQueueOptions);
-			// --- BIND RETRY QUEUE TO RETRY EXCHANGE ---
-			this.logger.debug(`Binding '${retryExchangeName}' -> '${retryQueueName}'...`);
-			this.channel.bindQueue(retryQueueName, retryExchangeName, retryQueueName);
+				// --- SETUP RETRY QUEUE WITH TTL ---
+				const retryQueueOptions = {
+					...queueOptions,
+					deadLetterExchange: chan.name,
+					deadLetterRoutingKey: queueName,
+					messageTtl: this.opts.retryInterval || 0
+				};
+				this.logger.debug(`Asserting '${retryQueueName}' queue...`, retryQueueOptions);
+				await this.channel.assertQueue(retryQueueName, retryQueueOptions);
+
+				// --- BIND RETRY QUEUE TO RETRY EXCHANGE ---
+				this.logger.debug(`Binding '${retryExchangeName}' -> '${retryQueueName}'...`);
+				this.channel.bindQueue(retryQueueName, retryExchangeName, retryQueueName);
+			}
 
 			// More info http://www.squaremobius.net/amqp.node/channel_api.html#channel_consume
 			const consumerOptions = _.defaultsDeep(
