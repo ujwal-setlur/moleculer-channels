@@ -554,7 +554,8 @@ class AmqpAdapter extends BaseAdapter {
 				headers: {
 					[C.HEADER_ORIGINAL_CHANNEL]: chan.name,
 					[C.HEADER_ORIGINAL_GROUP]: chan.group,
-					[C.HEADER_ERROR_MESSAGE]: err.message
+					[C.HEADER_ERROR_MESSAGE]: err.message,
+					...(msg.properties && msg.properties.headers ? msg.properties.headers : {})
 				}
 			}
 		);
